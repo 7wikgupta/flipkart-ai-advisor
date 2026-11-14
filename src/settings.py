@@ -7,6 +7,7 @@ before a query runs.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -50,3 +51,14 @@ DEFAULT_LLM_MODEL = "gpt-4o-mini"
 NAMED_MATCH_MIN_OVERLAP = 0.6  # share of a named product's words that must appear in a product name
 NAMED_CANDIDATES = 10  # candidates searched per named product
 LLM_TIMEOUT_SECONDS = 15.0  # per request; a stalled request is retried (max_retries=2). Gemini Flash-Lite answers in 1.5-7 s but occasionally stalls ~40 s
+
+# Phase 4 Hybrid RAG (src/hybrid.py). RETRIEVAL_MODE in the environment overrides the default.
+RETRIEVAL_MODE_ENV = "RETRIEVAL_MODE"
+DEFAULT_RETRIEVAL_MODE = "hybrid"  # adopted on docs/hybrid_evaluation.md evidence
+BM25_K1 = 1.5
+BM25_B = 0.75
+RRF_K = 60  # standard Reciprocal Rank Fusion constant
+
+
+def retrieval_mode() -> str:
+    return os.getenv(RETRIEVAL_MODE_ENV) or DEFAULT_RETRIEVAL_MODE

@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 
 from src import settings
 from src.rag_pipeline import LLMUnavailableError, RagResult, answer_question
+from src.hybrid import make_retriever
 from src.retrieval import Retriever
 from src.ui_helpers import (EXAMPLE_PROMPTS, REASON_LABELS, cache_key, format_price, format_rating,
                             number_citations, source_numbers)
@@ -35,7 +36,7 @@ st.set_page_config(page_title="Flipkart AI Electronics Advisor", page_icon="🛒
 @st.cache_resource(show_spinner="Loading the product index and embedding model...")
 def get_retriever() -> Retriever:
     """Load the embedding model and ChromaDB collection once per server process."""
-    return Retriever()
+    return make_retriever()
 
 
 @st.cache_resource
@@ -143,7 +144,8 @@ with st.sidebar:
         st.rerun()
     st.divider()
     st.caption(f"Model: `{os.getenv(settings.LLM_MODEL_ENV) or settings.DEFAULT_LLM_MODEL}` · "
-               f"prompt {settings.PROMPT_VERSION} · top {settings.DEFAULT_TOP_K} sources")
+               f"prompt {settings.PROMPT_VERSION} · {settings.retrieval_mode()} retrieval · "
+               f"top {settings.DEFAULT_TOP_K} sources")
 
 st.title("🛒 Flipkart AI Electronics Advisor")
 st.caption("Recommendations and comparisons grounded in catalogue records, with sources.")
