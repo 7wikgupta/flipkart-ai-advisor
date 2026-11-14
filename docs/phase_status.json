@@ -22,7 +22,7 @@
     "owner": "M3",
     "status": "in_progress",
     "handoff": "handoffs/phase-03.md",
-    "evidence": "Code, prompt v1, budget/category extraction, fallback and history done. 63 unit tests pass locally (LLM mocked). Rebuilt index and real-index suite pass; F1/F2 fixed by category filters (5/5 each). Live Gemini demo run on 8 questions: citations valid, fallbacks work; its 2 defects (comparison picks wrong named product, refusals flagged grounded) fixed and re-verified; client timeout added; prompt v2; 69 tests pass. CI NOT RUN; Phase 2 acceptance by M3 still pending."
+    "evidence": "Code, prompt v1, budget/category extraction, fallback and history done. 63 unit tests pass locally (LLM mocked). Rebuilt index and real-index suite pass; F1/F2 fixed by category filters (5/5 each). Live Gemini demo run on 8 questions: citations valid, fallbacks work; its 2 defects (comparison picks wrong named product, refusals flagged grounded) fixed and re-verified; client timeout added; prompt v2; 69 tests pass. CI NOT RUN; Phase 2 acceptance by M3 still pending. M4 reproduced at 75bda24 on Python 3.12 (14 Nov 2026): hashes, 69 tests, live LLM test and 4 live questions pass; accepts with tracked issues once Phase 2 is accepted and CI is green."
   },
   {
     "phase": 4,
