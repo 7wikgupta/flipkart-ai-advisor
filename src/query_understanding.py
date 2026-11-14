@@ -84,6 +84,12 @@ def understand(question: str) -> Constraints:
     return Constraints(max_price=hi, min_price=lo, categories=extract_categories(question))
 
 
+def is_follow_up(question: str) -> bool:
+    """In a conversation, a question that names no product category continues the current topic
+    ("which is the best?", "is the zebie good?"). Naming a category starts a new one."""
+    return not extract_categories(question)
+
+
 _COMPARE_LEAD = re.compile(
     r"\b(?:compare|comparison\s+of|comparing|difference(?:s)?\s+between|diff\s+between)\s+(.+)$", re.I)
 _SEPARATOR = re.compile(r"\s+(?:vs\.?|versus|and|with|or|to)\s+", re.I)

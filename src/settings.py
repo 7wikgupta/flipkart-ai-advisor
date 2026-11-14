@@ -49,4 +49,4 @@ LLM_MODEL_ENV = "LLM_MODEL"
 DEFAULT_LLM_MODEL = "gpt-4o-mini"
 NAMED_MATCH_MIN_OVERLAP = 0.6  # share of a named product's words that must appear in a product name
 NAMED_CANDIDATES = 10  # candidates searched per named product
-LLM_TIMEOUT_SECONDS = 45.0  # per request; the SDK default of 600 s would freeze the UI on a stalled provider
+LLM_TIMEOUT_SECONDS = 15.0  # per request; a stalled request is retried (max_retries=2). Gemini Flash-Lite answers in 1.5-7 s but occasionally stalls ~40 s

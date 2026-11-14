@@ -14,7 +14,8 @@ sys.path.insert(0, str(ROOT))
 
 from src import settings  # noqa: E402
 from src.prompts import FALLBACK_MESSAGE, NO_BUDGET_MATCH_MESSAGE, SYSTEM_PROMPT, build_context  # noqa: E402
-from src.query_understanding import extract_budget, extract_categories, extract_comparison_targets, understand  # noqa: E402
+from src.query_understanding import (extract_budget, extract_categories, extract_comparison_targets, is_follow_up,  # noqa: E402
+                                     understand)
 from src.rag_pipeline import LLMUnavailableError, answer_question  # noqa: E402
 from src.retrieval import RetrievedChunk  # noqa: E402
 
@@ -227,6 +228,44 @@ class PipelineTests(unittest.TestCase):
     def test_empty_question_rejected(self):
         with self.assertRaises(ValueError):
             answer_question("  ", retriever=FakeRetriever([]), client=FakeClient())
+
+
+class FollowUpTests(unittest.TestCase):
+    HISTORY = [{"role": "user", "content": "Suggest a power bank under 1500"},
+               {"role": "assistant", "content": "Try [P1]."}]
+
+    def test_follow_up_detection(self):
+        self.assertTrue(is_follow_up("Which of those has the highest capacity?"))
+        self.assertTrue(is_follow_up("And the cheaper one?"))
+        self.assertTrue(is_follow_up("which is the best?"))
+        self.assertTrue(is_follow_up("is the zebie good?"))
+        self.assertFalse(is_follow_up("Suggest a router under 1500"))
+        self.assertFalse(is_follow_up("Which of these routers is best?"))  # names its own category
+
+    def test_follow_up_searches_with_earlier_question_and_filters(self):
+        retriever = FakeRetriever([chunk("P1", category="Power Banks")])
+        answer_question("Which of those has the highest capacity?", self.HISTORY, retriever=retriever,
+                        client=FakeClient("[P1]"))
+        query, _, kwargs = retriever.calls[0]
+        self.assertEqual(query, "Suggest a power bank under 1500 Which of those has the highest capacity?")
+        self.assertEqual(kwargs, {"max_price": 1500, "min_price": None, "categories": ["Power Banks"]})
+
+    def test_follow_up_budget_overrides_earlier_budget(self):
+        retriever = FakeRetriever([chunk("P1", category="Power Banks")])
+        answer_question("What about those under 1000?", self.HISTORY, retriever=retriever, client=FakeClient("[P1]"))
+        self.assertEqual(retriever.calls[0][2]["max_price"], 1000)
+
+    def test_chained_follow_ups_use_last_standalone_question(self):
+        history = self.HISTORY + [{"role": "user", "content": "Which of those is cheapest?"},
+                                  {"role": "assistant", "content": "[P1]"}]
+        retriever = FakeRetriever([chunk("P1", category="Power Banks")])
+        answer_question("Is it good for travel?", history, retriever=retriever, client=FakeClient("[P1]"))
+        self.assertTrue(retriever.calls[0][0].startswith("Suggest a power bank under 1500 "))
+
+    def test_new_topic_is_searched_alone(self):
+        retriever = FakeRetriever([chunk("P1")])
+        answer_question("Suggest a router", self.HISTORY, retriever=retriever, client=FakeClient("[P1]"))
+        self.assertEqual(retriever.calls[0][0], "Suggest a router")
 
 
 @unittest.skipUnless(os.getenv("RUN_LLM_TESTS") == "1" and os.getenv(settings.LLM_API_KEY_ENV),
