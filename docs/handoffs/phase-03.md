@@ -104,7 +104,7 @@ Fresh clone of `main` at `75bda24` (merge of PR #7), macOS arm64, Python 3.12.12
 | Comparison | "Compare the TP-LINK TL-WR841N and the iBall 150M router" | `answered`, both named products compared (INR 1,118 vs 929), no invalid citations | PASS |
 | Budget fallback | "Best laptop under 30000" | `no_budget_match`, no LLM call | PASS |
 | Off-topic fallback | "What is the capital of France?" | `weak_evidence`, no LLM call | PASS |
-| CI on Python 3.12 | GitHub Actions | Not observed for PR #7 | NOT RUN |
+| CI on Python 3.12 | GitHub Actions | [Run 43624183990](https://github.com/bharat0722/flipkart-ai-advisor/actions/runs/43624183990) on PR #8 (Phase 3 code on `main` plus this review): passed in 1m33s | PASS |
 
 Findings for M3 (non-blocking):
 
@@ -118,10 +118,10 @@ Findings for M3 (non-blocking):
 - [x] Reviewer recorded evidence, decision and any outstanding items.
 - [ ] The reviewed work was merged and the accepted snapshot tagged.
 
-Decision: **Accept with tracked issues (M4, 14 November 2026), conditional.** Recommendations, comparisons, budget filtering and fallbacks reproduce with valid citations. Before Phase 3 is set to `accepted`: Phase 2 acceptance by M3 must be recorded, and CI must pass on Python 3.12. Status stays `in_progress` until then.
+Decision: **Accept with tracked issues (M4, 14 November 2026), conditional.** Recommendations, comparisons, budget filtering and fallbacks reproduce with valid citations. CI now passes on Python 3.12 ([run](https://github.com/bharat0722/flipkart-ai-advisor/actions/runs/43624183990)). Before Phase 3 is set to `accepted`, Phase 2 acceptance by M3 must be recorded. Status stays `in_progress` until then.
 
 | Role | Name | Date | Commit | Decision or evidence |
 | --- | --- | --- | --- | --- |
 | Outgoing lead (M3) | Pending | | | Pending live run |
-| Receiving lead (M4) | M4 | 2026-11-14 | `75bda24` | Accept with tracked issues, conditional on Phase 2 acceptance and green CI. Reproduction above. |
+| Receiving lead (M4) | M4 | 2026-11-14 | `75bda24` | Accept with tracked issues, conditional on Phase 2 acceptance. CI green on PR #8. Reproduction above. |
 | QA reviewer (M5) | Pending | | | Pending |
