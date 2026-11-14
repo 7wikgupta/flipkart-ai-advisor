@@ -24,7 +24,7 @@
 ## Snapshot and artifacts
 
 - Repository: https://github.com/bharat0722/flipkart-ai-advisor, base `main` at `75bda24`, branch `feat/phase-04-streamlit-app`.
-- Reviewed commit and PR: pending (to be pushed). Milestone [Phase 4](https://github.com/bharat0722/flipkart-ai-advisor/milestone/4), no issues filed yet. Tag after acceptance: `phase-4-complete`.
+- Reviewed commit and PR: `d1cc614`, [PR #9](https://github.com/bharat0722/flipkart-ai-advisor/pull/9). Phase 3 review: [PR #8](https://github.com/bharat0722/flipkart-ai-advisor/pull/8). Milestone [Phase 4](https://github.com/bharat0722/flipkart-ai-advisor/milestone/4), no issues filed yet. Tag after acceptance: `phase-4-complete`.
 - New files: `src/ui_helpers.py`, `src/hybrid.py`, `scripts/build_display_data.py`, `scripts/hybrid_eval.py`, `tests/test_app.py`, `tests/test_hybrid.py`, `docs/hybrid_evaluation.md`, this handoff.
 - Changed files: `app.py` (was a placeholder), `src/rag_pipeline.py` and `src/query_understanding.py` (follow-ups), `src/settings.py` (timeout, retrieval mode, BM25/RRF constants), `tests/test_rag.py`, `requirements.txt` (`streamlit==1.67.0`), `.env.example`, `README.md`, `docs/phase_status.json`, `docs/PRD.md` (generated table).
 - Interfaces:
@@ -59,7 +59,7 @@ answer_question(question, history, retriever=retriever)  # unchanged signature; 
 | Latency, `gemini-3.1-flash-lite` | A few seconds per answer | 8 questions: median 2.2 s, max 2.5 s. A stall in an earlier run took 16.9 s with the 15 s retry (was 45-90 s) | PASS | M4 |
 | Hybrid vs semantic ([evidence](../hybrid_evaluation.md)) | Rule fixed before running: better named lookup, at most 1 category hit lost, under 50 ms extra, budgets hold, off-topic scores not higher | Named product rank 1: 22/30 → 25/30; top 5: 25/30 → 28/30; MRR 0.783 → 0.869. Category queries 12/14 both unfiltered (55 → 54 hits), 14/14 both with app filters. Budgets hold. Off-topic scores identical. Median latency +1-2 ms | PASS (adopted) | M4 |
 | Presentation laptop launch | App starts and answers there | Run on M4's MacBook only | NOT RUN on a different machine | M4 / M5 |
-| CI on Python 3.12 | Green | Branch not pushed yet | NOT RUN | M4 |
+| CI on Python 3.12 | Green | [Run 43624192175](https://github.com/bharat0722/flipkart-ai-advisor/actions/runs/43624192175) on PR #9 at `d1cc614`: passed in 1m36s | PASS | M4 |
 
 ## Issues and transition
 

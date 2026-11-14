@@ -30,7 +30,7 @@
     "owner": "M4",
     "status": "ready_for_review",
     "handoff": "handoffs/phase-04.md",
-    "evidence": "Streamlit chat with product cards (image, historical price, rating, link), follow-ups, answer cache; gemini-3.1-flash-lite median 2.2 s. Hybrid RAG adopted: named-product rank 1 22/30 to 25/30, category queries unchanged with app filters, off-topic scores unchanged. Fresh clone reproduces from README; 96 tests pass. Presentation-laptop run and CI pending. Awaiting M5 review."
+    "evidence": "Streamlit chat with product cards (image, historical price, rating, link), follow-ups, answer cache; gemini-3.1-flash-lite median 2.2 s. Hybrid RAG adopted: named-product rank 1 22/30 to 25/30, category queries unchanged with app filters, off-topic scores unchanged. Fresh clone reproduces from README; 96 tests pass. CI green on PR #9. Presentation-laptop run pending. Awaiting M5 review."
   },
   {
     "phase": 5,
