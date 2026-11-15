@@ -88,17 +88,40 @@ result.to_dict()             # JSON-safe
 - Receiving phase (M4): build the Streamlit chat on `answer_question()`: show `answer`, `sources` (price, source_ref), `grounded`/`reason`, handle `LLMUnavailableError`, keep `history` as a list of `{role, content}`.
 - Interface constraints: `price is None` means unknown. Never show the prices as current.
 
+## M4 independent reproduction (14 November 2026)
+
+Fresh clone of `main` at `75bda24` (merge of PR #7), macOS arm64, Python 3.12.12 (`uv venv --python 3.12`), `pip check` clean (107 packages). Provider Gemini via the OpenAI-compatible endpoint, `LLM_MODEL=gemini-3.5-flash`, M4's own key.
+
+| Check | Command | Result | Status |
+| --- | --- | --- | --- |
+| Raw data | Official Kaggle download, `shasum -a 256` | `56f8f699…93ad1`, matches | PASS |
+| Phase 1 rebuild | `python -m src.preprocess` | 288 of 20000 retained, cleaned SHA-256 `f13d7836…4bc9`, matches | PASS |
+| Phase 2 index | `python scripts/build_index.py` | 288 products, 863 chunks, `flipkart_electronics_v1` | PASS |
+| Full suite | `RUN_MODEL_TESTS=1 python -m unittest discover -s tests` | 69 OK, 1 skipped (live LLM) | PASS |
+| Live LLM test | `set -a; . ./.env; set +a; RUN_MODEL_TESTS=1 RUN_LLM_TESTS=1 python -m unittest tests.test_rag -v` | 25 OK, 0 skipped | PASS |
+| Compile and PRD | `python -m compileall -q app.py src tests scripts`, `python scripts/sync_prd.py --check` | Clean, table current | PASS |
+| Recommendation | "Suggest a power bank under 1500" | `answered`, 4 power banks under INR 1,500 cited, prices labelled historical, no invalid citations | PASS |
+| Comparison | "Compare the TP-LINK TL-WR841N and the iBall 150M router" | `answered`, both named products compared (INR 1,118 vs 929), no invalid citations | PASS |
+| Budget fallback | "Best laptop under 30000" | `no_budget_match`, no LLM call | PASS |
+| Off-topic fallback | "What is the capital of France?" | `weak_evidence`, no LLM call | PASS |
+| CI on Python 3.12 | GitHub Actions | [Run 43624183990](https://github.com/bharat0722/flipkart-ai-advisor/actions/runs/43624183990) on PR #8 (Phase 3 code on `main` plus this review): passed in 1m33s | PASS |
+
+Findings for M3 (non-blocking):
+
+- The live test's skip check reads `OPENAI_API_KEY` from the shell before `.env` is loaded, so with only `.env` set it is silently skipped. Export `.env` first (as above) or load it in the test module.
+- Answers cite raw IDs such as `[P-1f3d…]`. M4 will map them to numbered source cards in the Streamlit app.
+
 ## Acceptance
 
-- [ ] Completed scope meets phase acceptance criteria.
-- [ ] Receiving lead independently reproduced the result at the recorded commit.
-- [ ] Reviewer recorded evidence, decision and any outstanding items.
+- [x] Completed scope meets phase acceptance criteria.
+- [x] Receiving lead independently reproduced the result at the recorded commit.
+- [x] Reviewer recorded evidence, decision and any outstanding items.
 - [ ] The reviewed work was merged and the accepted snapshot tagged.
 
-Decision: **Pending.** Draft: code, mocked tests, real-index suite and F1/F2 retrieval re-run are done; the live Gemini demo is done, its two defects (wrong product in comparisons, refusals flagged grounded) are fixed and re-verified live; CI is NOT RUN.
+Decision: **Accept with tracked issues (M4, 14 November 2026), conditional.** Recommendations, comparisons, budget filtering and fallbacks reproduce with valid citations. CI now passes on Python 3.12 ([run](https://github.com/bharat0722/flipkart-ai-advisor/actions/runs/43624183990)). Before Phase 3 is set to `accepted`, Phase 2 acceptance by M3 must be recorded. Status stays `in_progress` until then.
 
 | Role | Name | Date | Commit | Decision or evidence |
 | --- | --- | --- | --- | --- |
 | Outgoing lead (M3) | Pending | | | Pending live run |
-| Receiving lead (M4) | Pending | | | Pending |
+| Receiving lead (M4) | M4 | 2026-11-14 | `75bda24` | Accept with tracked issues, conditional on Phase 2 acceptance. CI green on PR #8. Reproduction above. |
 | QA reviewer (M5) | Pending | | | Pending |
