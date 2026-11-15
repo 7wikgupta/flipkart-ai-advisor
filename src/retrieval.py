@@ -22,6 +22,20 @@ from src import settings
 from src.embeddings import Embedder, get_embedder
 from src.vector_store import IndexNotReadyError, open_collection
 
+# Phase 5 fix: mirrors src.query_understanding._CONNECTIVITY_KEYWORDS. Checked against the product
+# NAME, not the full chunk text - the dataset's own "Wired/Wireless" spec-field label appears in nearly
+# every headphone's description regardless of its actual connectivity, so matching the full text there
+# would promote wired products just as often as wireless ones.
+_CONNECTIVITY_NAME_HINTS: dict[str, tuple[str, ...]] = {
+    "wireless": ("wireless", "bluetooth", "cordless"),
+    "wired": ("wired", "corded"),
+}
+
+
+def _matches_connectivity(name: str, label: str) -> bool:
+    name = name.lower()
+    return any(hint in name for hint in _CONNECTIVITY_NAME_HINTS.get(label, ()))
+
 
 @dataclass(frozen=True)
 class RetrievedChunk:
@@ -76,7 +90,7 @@ class Retriever:
 
     def search(self, query: str, k: int = settings.DEFAULT_TOP_K, *, max_price: float | None = None,
                min_price: float | None = None, categories: list[str] | None = None,
-               unique_products: bool = True) -> list[RetrievedChunk]:
+               unique_products: bool = True, connectivity: str | None = None) -> list[RetrievedChunk]:
         query = (query or "").strip()
         if not query:
             raise ValueError("Query must not be empty.")
@@ -116,8 +130,14 @@ class Retriever:
                 chunk_count=int(meta["chunk_count"]),
                 text=text,
             ))
-            if len(results) == k:
+            if not connectivity and len(results) == k:
                 break
+        if connectivity:
+            # Phase 5 fix: promote chunks that mention the requested connectivity (e.g. "wireless")
+            # ahead of same-category chunks that don't, instead of relying on raw distance order,
+            # which lets a much larger non-matching cluster (e.g. wired headphones) crowd it out.
+            results.sort(key=lambda r: 0 if _matches_connectivity(r.name, connectivity) else 1)
+            results = [RetrievedChunk(**{**r.to_dict(), "rank": i}) for i, r in enumerate(results[:k], 1)]
         return results
 
 

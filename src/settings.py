@@ -51,6 +51,13 @@ DEFAULT_LLM_MODEL = "gpt-4o-mini"
 NAMED_MATCH_MIN_OVERLAP = 0.6  # share of a named product's words that must appear in a product name
 NAMED_CANDIDATES = 10  # candidates searched per named product
 LLM_TIMEOUT_SECONDS = 15.0  # per request; a stalled request is retried (max_retries=2). Gemini Flash-Lite answers in 1.5-7 s but occasionally stalls ~40 s
+# Phase 5 reliability fix: if the primary model fails (timeout, 5xx, or similar transient error) even
+# after its own retries, try once more with a different, slower-but-steadier model before giving up,
+# instead of making the person resend the question by hand. The fallback gets its own longer timeout
+# because it is deliberately a different (often slower) model than the primary.
+LLM_FALLBACK_MODEL_ENV = "LLM_FALLBACK_MODEL"
+DEFAULT_FALLBACK_LLM_MODEL = "gemini-3.5-flash"
+LLM_FALLBACK_TIMEOUT_SECONDS = 45.0
 
 # Phase 4 Hybrid RAG (src/hybrid.py). RETRIEVAL_MODE in the environment overrides the default.
 RETRIEVAL_MODE_ENV = "RETRIEVAL_MODE"
@@ -58,6 +65,10 @@ DEFAULT_RETRIEVAL_MODE = "hybrid"  # adopted on docs/hybrid_evaluation.md eviden
 BM25_K1 = 1.5
 BM25_B = 0.75
 RRF_K = 60  # standard Reciprocal Rank Fusion constant
+# Phase 5 fix: a flat score bonus for a chunk matching the question's connectivity preference
+# ("wireless"/"wired"). Far larger than any possible RRF increment (max ~2/(RRF_K+1) ~= 0.033),
+# so a matching product always outranks a same-category non-matching one, however it was found.
+CONNECTIVITY_BOOST = 1.0
 
 
 def retrieval_mode() -> str:

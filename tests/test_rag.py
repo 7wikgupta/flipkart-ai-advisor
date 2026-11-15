@@ -14,8 +14,8 @@ sys.path.insert(0, str(ROOT))
 
 from src import settings  # noqa: E402
 from src.prompts import FALLBACK_MESSAGE, NO_BUDGET_MATCH_MESSAGE, SYSTEM_PROMPT, build_context  # noqa: E402
-from src.query_understanding import (extract_budget, extract_categories, extract_comparison_targets, is_follow_up,  # noqa: E402
-                                     understand)
+from src.query_understanding import (extract_budget, extract_categories, extract_comparison_targets,  # noqa: E402
+                                     extract_connectivity, is_follow_up, understand)
 from src.rag_pipeline import LLMUnavailableError, answer_question  # noqa: E402
 from src.retrieval import RetrievedChunk  # noqa: E402
 
@@ -47,6 +47,20 @@ class FakeClient:
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=self.reply))])
 
 
+class FailOnModelClient:
+    """Fails for one model, succeeds for any other - proves _call_llm actually switches models."""
+
+    def __init__(self, fail_model, reply="Try [P1]."):
+        self.fail_model, self.reply, self.calls = fail_model, reply, []
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
+
+    def _create(self, **kwargs):
+        self.calls.append(kwargs)
+        if kwargs["model"] == self.fail_model:
+            raise TimeoutError("stalled")
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=self.reply))])
+
+
 class BudgetTests(unittest.TestCase):
     def test_max_price_forms(self):
         for text, expected in [("laptop under 50,000", 50000), ("below Rs 2000", 2000), ("under ₹1,500", 1500),
@@ -68,6 +82,28 @@ class BudgetTests(unittest.TestCase):
 
     def test_no_budget(self):
         self.assertEqual(extract_budget("best wireless router"), (None, None))
+
+    def test_trailing_clause_after_amount_does_not_hide_budget(self):
+        # Phase 5 regression: "with" was mistaken for the start of "watt(s)" by the unit-exclusion
+        # lookahead, silently dropping the whole budget for any "under X with <feature>" phrasing.
+        for text, expected in [
+            ("home theatre system under 5000 with good power output", 5000),
+            ("router under 2000 with dual antenna", 2000),
+            ("laptop under 40000 with a good display", 40000),
+        ]:
+            with self.subTest(text=text):
+                self.assertEqual(extract_budget(text), (None, expected))
+
+
+class ConnectivityTests(unittest.TestCase):
+    def test_wireless_and_wired(self):
+        self.assertEqual(extract_connectivity("Suggest wireless headphones under 2000"), "wireless")
+        self.assertEqual(extract_connectivity("a bluetooth speaker"), "wireless")
+        self.assertEqual(extract_connectivity("wired earphones only"), "wired")
+        self.assertIsNone(extract_connectivity("good headphones under 2000"))
+
+    def test_understand_carries_connectivity(self):
+        self.assertEqual(understand("wireless headphones under 2000").connectivity, "wireless")
 
 
 class CategoryTests(unittest.TestCase):
@@ -153,7 +189,8 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(r.grounded)
         self.assertEqual(r.reason, "answered")
         self.assertEqual(r.cited_product_ids, ["P1", "P2"])
-        self.assertEqual(retriever.calls[0][2], {"max_price": 1500, "min_price": None, "categories": ["Routers & Networking"]})
+        self.assertEqual(retriever.calls[0][2], {"max_price": 1500, "min_price": None,
+                                                 "categories": ["Routers & Networking"], "connectivity": None})
         sent = client.calls[0]["messages"]
         self.assertEqual(sent[0]["role"], "system")
         self.assertIn("[P1]", sent[-1]["content"])
@@ -202,6 +239,22 @@ class PipelineTests(unittest.TestCase):
         with self.assertRaises(LLMUnavailableError):
             answer_question("router", retriever=FakeRetriever([chunk("P1")]), client=FakeClient(fail=True))
 
+    def test_falls_back_to_a_different_model_after_a_transient_failure(self):
+        # Phase 5 reliability fix: a transient failure on the primary model (timeout, 5xx, ...)
+        # should not surface to the person as a dead end; try once more with a different model first.
+        saved = {k: os.environ.pop(k, None) for k in (settings.LLM_MODEL_ENV, settings.LLM_FALLBACK_MODEL_ENV)}
+        try:
+            client = FailOnModelClient(fail_model=settings.DEFAULT_LLM_MODEL)
+            r = answer_question("router", retriever=FakeRetriever([chunk("P1")]), client=client)
+            self.assertEqual(r.reason, "answered")
+            self.assertEqual([c["model"] for c in client.calls],
+                             [settings.DEFAULT_LLM_MODEL, settings.DEFAULT_FALLBACK_LLM_MODEL])
+            self.assertEqual(client.calls[1]["timeout"], settings.LLM_FALLBACK_TIMEOUT_SECONDS)
+        finally:
+            for k, v in saved.items():
+                if v is not None:
+                    os.environ[k] = v
+
     def test_missing_key_is_a_friendly_error(self):
         saved = os.environ.pop(settings.LLM_API_KEY_ENV, None)
         try:
@@ -248,7 +301,8 @@ class FollowUpTests(unittest.TestCase):
                         client=FakeClient("[P1]"))
         query, _, kwargs = retriever.calls[0]
         self.assertEqual(query, "Suggest a power bank under 1500 Which of those has the highest capacity?")
-        self.assertEqual(kwargs, {"max_price": 1500, "min_price": None, "categories": ["Power Banks"]})
+        self.assertEqual(kwargs, {"max_price": 1500, "min_price": None, "categories": ["Power Banks"],
+                                  "connectivity": None})
 
     def test_follow_up_budget_overrides_earlier_budget(self):
         retriever = FakeRetriever([chunk("P1", category="Power Banks")])

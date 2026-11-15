@@ -74,14 +74,25 @@ answer_question(question, history, retriever=retriever)  # unchanged signature; 
 ## Acceptance
 
 - [x] Completed scope meets phase acceptance criteria.
-- [ ] Receiving lead independently reproduced the result at the recorded commit.
-- [ ] Reviewer recorded evidence, decision and any outstanding items.
+- [x] Receiving lead independently reproduced the result at the recorded commit.
+- [x] Reviewer recorded evidence, decision and any outstanding items.
 - [ ] The reviewed work was merged and the accepted snapshot tagged.
 
-Decision: **Pending** M5 review.
+Decision: **Accepted with tracked issues.** M5 independently reproduced this phase on `main` at `ffd1580` (after PR #8 and #9 merged): fresh dataset download (hash match), preprocessing (288 records), index build (863 chunks), 95/96 unit tests pass (1 skipped without `RUN_LLM_TESTS`), 30/30 live-LLM tests pass, `scripts/hybrid_eval.py` reproduces the published numbers exactly (named-product top-5 25/30→28/30, MRR 0.783→0.869), and the Streamlit app was launched and driven through factual, comparison and unsupported-question flows with correct behavior in each.
+
+M5's Phase 5 evaluation corpus (`docs/evaluation.md`, `data/evaluation/results.csv`) found two reproducible defects not covered above, and M5 held this phase open until they were fixed rather than tracking them as accepted limitations. **Both are now fixed** on branch `fix/p5-eval-defects` (not yet merged):
+
+1. **Budget constraint silently dropped** on "under `<number>` with `<trailing clause>`" phrasing (see `docs/evaluation.md` failure case 1) — fixed: `_AMOUNT`'s unit-exclusion lookahead was missing a trailing `\b`, so "with" was mistaken for "watt(s)"; added the `\b` plus a defense-in-depth price post-filter in `answer_question()`. Re-verified: the home-theatre question now returns only the 2 in-budget products.
+2. **Wireless products never retrieved** for a wireless-specific query despite being in-budget and in-category (see `docs/evaluation.md` failure case 2) — fixed: added `Constraints.connectivity` plus a name-matched boost/re-rank in `Retriever.search()` and `HybridRetriever.search()`. Re-verified: the wireless-headphones question now returns real wireless products instead of refusing.
+
+Full re-verification after both fixes: 99/100 unit tests pass (1 skipped without `RUN_LLM_TESTS`), 33/33 live-LLM tests pass, `scripts/phase5_evaluation.py` re-run end to end with no regressions in the other 15 questions. New regression tests: `BudgetTests.test_trailing_clause_after_amount_does_not_hide_budget` and `RealIndexTests.test_wireless_headphones_connectivity_regression`.
+
+Tracked, non-blocking (not new - see "Issues and transition" above and `docs/evaluation.md`): off-topic follow-up questions inherit the earlier topic's filter; the presentation-laptop run has only been done on M4's machine, not a second one.
+
+Next action: merge `fix/p5-eval-defects` into `main` (via PR) and tag `phase-4-complete`.
 
 | Role | Name | Date | Commit | Decision or evidence |
 | --- | --- | --- | --- | --- |
 | Outgoing lead (M4) | M4 | 2026-11-14 | `c561ddf` | Ready for review. Evidence above. |
-| Receiving lead (M5) | Pending | | | Pending |
+| Receiving lead (M5) | Divyansh | 2026-11-15 | `1c3e13f` | Accepted with tracked issues. Evidence above; see `docs/evaluation.md`. |
 | QA reviewer | Pending | | | Pending |
