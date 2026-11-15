@@ -51,6 +51,20 @@ RUN_MODEL_TESTS=1 python -m unittest discover -s tests -v
 
 On Linux CI, install CPU-only torch first with `python -m pip install torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu`. On Windows ARM64, use an x64 Python 3.12. See the [Phase 2 build log](docs/phase2_build_log.md) for design, settings, the chunk-size experiment and failure cases. See the [Phase 2 handoff](docs/handoffs/phase-02.md) for acceptance and [retrieval evidence](docs/retrieval_evidence.md) for sample results.
 
+## Phase 4: run the Streamlit app
+
+The app answers from the Phase 2 index through the Phase 3 pipeline. It needs the cleaned CSV and index from the steps above, product images and ratings, and an LLM key.
+
+```sh
+python scripts/build_display_data.py                # images and ratings for the product cards (288 products, 91 rated)
+cp .env.example .env                                # then set OPENAI_API_KEY, OPENAI_BASE_URL and LLM_MODEL
+streamlit run app.py                                # opens http://localhost:8501
+```
+
+Use a Gemini key from [Google AI Studio](https://aistudio.google.com/apikey) with `OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/` and `LLM_MODEL=gemini-3.1-flash-lite`. Answers take about 2 s. `gemini-3.5-flash` also works but takes about 38 s because it reasons before answering. A stalled request is retried after 15 s.
+
+Answers cite products as `[1]`, `[2]`, matching the product cards below the answer. Clicking a card's image or name opens the 2015-16 Flipkart listing. Every retrieved record is under "All retrieved records". Follow-up questions that name no product category, such as "which is the best?", continue the previous topic. Repeated questions are answered from an in-memory cache, which clears when the app restarts. Before a demo, ask the demo questions once to warm the cache.
+
 ## Team workflow
 
 Use `main` as the stable branch. Review Phase 1 on `feat/phase-01-dataset-foundation`. See the [GitHub workflow](docs/github_workflow.md) and [Phase 1 handoff](docs/handoffs/phase-01.md) for acceptance and release tagging.
