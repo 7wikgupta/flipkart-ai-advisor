@@ -58,6 +58,10 @@ DEFAULT_RETRIEVAL_MODE = "hybrid"  # adopted on docs/hybrid_evaluation.md eviden
 BM25_K1 = 1.5
 BM25_B = 0.75
 RRF_K = 60  # standard Reciprocal Rank Fusion constant
+# Phase 5 fix: a flat score bonus for a chunk matching the question's connectivity preference
+# ("wireless"/"wired"). Far larger than any possible RRF increment (max ~2/(RRF_K+1) ~= 0.033),
+# so a matching product always outranks a same-category non-matching one, however it was found.
+CONNECTIVITY_BOOST = 1.0
 
 
 def retrieval_mode() -> str:

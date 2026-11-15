@@ -28,10 +28,19 @@ CATEGORY_KEYWORDS: dict[str, list[str]] = {
 
 _UNITS = {"k": 1_000, "thousand": 1_000, "lakh": 100_000, "lac": 100_000}
 # An amount like "50,000", "Rs 2000", "₹1.5k". Not followed by a spec unit (16GB, 5000 mAh, 10 hours ...).
+# The trailing \b (Phase 5 fix) stops the bare "w" alternative (for "20 W") from also matching the first
+# letter of an unrelated following word such as "with", which silently dropped "under 5000 with ..." budgets.
 _AMOUNT = (r"(?:rs\.?|inr|₹)?\s*(\d[\d,]*(?:\.\d+)?)\s*(k|thousand|lakh|lac)?\b"
-           r"(?!\s*(?:gb|tb|mb|mah|w|watt|watts|hours?|hrs?|mm|inch|inches|%|x|mp))")
+           r"(?!\s*(?:gb|tb|mb|mah|w|watt|watts|hours?|hrs?|mm|inch|inches|%|x|mp)\b)")
 _MAX_WORDS = r"(?:under|below|less than|lesser than|within|upto|up to|budget of|budget is|budget|max(?:imum)?|not more than|cheaper than)"
 _MIN_WORDS = r"(?:above|over|more than|at least|minimum|min|costlier than|starting from)"
+
+# Phase 5 fix: a question that names a connectivity preference should prioritize matching products
+# instead of letting the much larger wired/non-wireless cluster dominate semantic and keyword ranking.
+_CONNECTIVITY_KEYWORDS: dict[str, list[str]] = {
+    "wireless": ["wireless", "bluetooth", "cordless"],
+    "wired": ["wired", "corded"],
+}
 
 
 @dataclass(frozen=True)
@@ -39,9 +48,11 @@ class Constraints:
     max_price: float | None = None
     min_price: float | None = None
     categories: list[str] = field(default_factory=list)
+    connectivity: str | None = None  # "wireless" or "wired" when the question asks for one specifically
 
     def to_dict(self) -> dict:
-        return {"max_price": self.max_price, "min_price": self.min_price, "categories": list(self.categories)}
+        return {"max_price": self.max_price, "min_price": self.min_price, "categories": list(self.categories),
+                "connectivity": self.connectivity}
 
     @property
     def has_price_limit(self) -> bool:
@@ -79,9 +90,19 @@ def extract_categories(text: str) -> list[str]:
     return [category for category, words in CATEGORY_KEYWORDS.items() if any(f" {w} " in q for w in words)]
 
 
+def extract_connectivity(text: str) -> str | None:
+    """'wireless' or 'wired' when the question asks for that specifically; None otherwise."""
+    q = " " + re.sub(r"[^a-z0-9\- ]+", " ", text.lower()) + " "
+    for label, words in _CONNECTIVITY_KEYWORDS.items():
+        if any(f" {w} " in q for w in words):
+            return label
+    return None
+
+
 def understand(question: str) -> Constraints:
     lo, hi = extract_budget(question)
-    return Constraints(max_price=hi, min_price=lo, categories=extract_categories(question))
+    return Constraints(max_price=hi, min_price=lo, categories=extract_categories(question),
+                       connectivity=extract_connectivity(question))
 
 
 def is_follow_up(question: str) -> bool:

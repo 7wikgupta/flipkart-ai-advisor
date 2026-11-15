@@ -214,6 +214,27 @@ class RealIndexTests(unittest.TestCase):
         self.assertIn("Bluetooth", results[0].name)
         self.assertGreaterEqual(sum(r.category == "Speakers" for r in results), 2)
 
+    def test_wireless_headphones_connectivity_regression(self):
+        # Phase 5 regression (docs/evaluation.md failure case 2): without connectivity=,
+        # "wireless headphones under 2000" returned zero wireless products - the much larger
+        # wired cluster crowded every one out of the top 5. Both retrieval modes must now surface
+        # at least one. Checked against the product NAME, not the full chunk text: the dataset's
+        # own "Wired/Wireless" spec-field label appears in nearly every headphone's description
+        # regardless of its actual connectivity, which would give a false pass either way.
+        from src.hybrid import make_retriever
+        question = "Suggest wireless headphones under 2000 and say if any are foldable."
+        for mode in ("semantic", "hybrid"):
+            with self.subTest(mode=mode):
+                retriever = make_retriever(mode)
+                plain = retriever.search(question, k=5, max_price=2000,
+                                         categories=["Headphones & Earphones"])
+                self.assertFalse(any("wireless" in r.name.lower() for r in plain),
+                                 "fixture assumption changed: plain search already finds a wireless match")
+                fixed = retriever.search(question, k=5, max_price=2000,
+                                         categories=["Headphones & Earphones"], connectivity="wireless")
+                self.assertTrue(any("wireless" in r.name.lower() for r in fixed),
+                                [(r.name) for r in fixed])
+
     def test_charging_query(self):
         self.assert_category("fast mobile phone charger", "Chargers & Adapters")
 

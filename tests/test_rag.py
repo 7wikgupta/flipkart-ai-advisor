@@ -14,8 +14,8 @@ sys.path.insert(0, str(ROOT))
 
 from src import settings  # noqa: E402
 from src.prompts import FALLBACK_MESSAGE, NO_BUDGET_MATCH_MESSAGE, SYSTEM_PROMPT, build_context  # noqa: E402
-from src.query_understanding import (extract_budget, extract_categories, extract_comparison_targets, is_follow_up,  # noqa: E402
-                                     understand)
+from src.query_understanding import (extract_budget, extract_categories, extract_comparison_targets,  # noqa: E402
+                                     extract_connectivity, is_follow_up, understand)
 from src.rag_pipeline import LLMUnavailableError, answer_question  # noqa: E402
 from src.retrieval import RetrievedChunk  # noqa: E402
 
@@ -68,6 +68,28 @@ class BudgetTests(unittest.TestCase):
 
     def test_no_budget(self):
         self.assertEqual(extract_budget("best wireless router"), (None, None))
+
+    def test_trailing_clause_after_amount_does_not_hide_budget(self):
+        # Phase 5 regression: "with" was mistaken for the start of "watt(s)" by the unit-exclusion
+        # lookahead, silently dropping the whole budget for any "under X with <feature>" phrasing.
+        for text, expected in [
+            ("home theatre system under 5000 with good power output", 5000),
+            ("router under 2000 with dual antenna", 2000),
+            ("laptop under 40000 with a good display", 40000),
+        ]:
+            with self.subTest(text=text):
+                self.assertEqual(extract_budget(text), (None, expected))
+
+
+class ConnectivityTests(unittest.TestCase):
+    def test_wireless_and_wired(self):
+        self.assertEqual(extract_connectivity("Suggest wireless headphones under 2000"), "wireless")
+        self.assertEqual(extract_connectivity("a bluetooth speaker"), "wireless")
+        self.assertEqual(extract_connectivity("wired earphones only"), "wired")
+        self.assertIsNone(extract_connectivity("good headphones under 2000"))
+
+    def test_understand_carries_connectivity(self):
+        self.assertEqual(understand("wireless headphones under 2000").connectivity, "wireless")
 
 
 class CategoryTests(unittest.TestCase):
@@ -153,7 +175,8 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(r.grounded)
         self.assertEqual(r.reason, "answered")
         self.assertEqual(r.cited_product_ids, ["P1", "P2"])
-        self.assertEqual(retriever.calls[0][2], {"max_price": 1500, "min_price": None, "categories": ["Routers & Networking"]})
+        self.assertEqual(retriever.calls[0][2], {"max_price": 1500, "min_price": None,
+                                                 "categories": ["Routers & Networking"], "connectivity": None})
         sent = client.calls[0]["messages"]
         self.assertEqual(sent[0]["role"], "system")
         self.assertIn("[P1]", sent[-1]["content"])
@@ -248,7 +271,8 @@ class FollowUpTests(unittest.TestCase):
                         client=FakeClient("[P1]"))
         query, _, kwargs = retriever.calls[0]
         self.assertEqual(query, "Suggest a power bank under 1500 Which of those has the highest capacity?")
-        self.assertEqual(kwargs, {"max_price": 1500, "min_price": None, "categories": ["Power Banks"]})
+        self.assertEqual(kwargs, {"max_price": 1500, "min_price": None, "categories": ["Power Banks"],
+                                  "connectivity": None})
 
     def test_follow_up_budget_overrides_earlier_budget(self):
         retriever = FakeRetriever([chunk("P1", category="Power Banks")])

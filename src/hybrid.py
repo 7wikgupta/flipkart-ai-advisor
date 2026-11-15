@@ -17,7 +17,7 @@ import re
 from collections import Counter
 
 from src import settings
-from src.retrieval import RetrievedChunk, Retriever
+from src.retrieval import RetrievedChunk, Retriever, _matches_connectivity
 
 _TOKEN = re.compile(r"[a-z0-9]+")
 
@@ -89,7 +89,7 @@ class HybridRetriever(Retriever):
 
     def search(self, query: str, k: int = settings.DEFAULT_TOP_K, *, max_price: float | None = None,
                min_price: float | None = None, categories: list[str] | None = None,
-               unique_products: bool = True) -> list[RetrievedChunk]:
+               unique_products: bool = True, connectivity: str | None = None) -> list[RetrievedChunk]:
         pool = k * settings.CANDIDATE_MULTIPLIER
         semantic = super().search(query, pool, max_price=max_price, min_price=min_price, categories=categories)
         if not unique_products:
@@ -102,6 +102,16 @@ class HybridRetriever(Retriever):
         for rank, i in enumerate(keyword, 1):
             pid = self._metas[i]["product_id"]
             fused[pid] = fused.get(pid, 0.0) + 1 / (settings.RRF_K + rank)
+        if connectivity:
+            # Phase 5 fix: whichever list found it, a chunk matching the requested connectivity
+            # ("wireless"/"wired") gets a flat bonus that outweighs any RRF rank contribution, so it
+            # isn't crowded out of the fused top-k by a much larger non-matching cluster.
+            matching_pids = {r.product_id for r in semantic if _matches_connectivity(r.name, connectivity)}
+            matching_pids |= {self._metas[i]["product_id"] for i in keyword
+                              if _matches_connectivity(self._metas[i]["name"], connectivity)}
+            for pid in matching_pids:
+                if pid in fused:
+                    fused[pid] += settings.CONNECTIVITY_BOOST
         top = sorted(fused, key=lambda p: -fused[p])[:k]
 
         by_product = {r.product_id: r for r in semantic}

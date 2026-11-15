@@ -80,12 +80,14 @@ answer_question(question, history, retriever=retriever)  # unchanged signature; 
 
 Decision: **Changes required.** M5 independently reproduced this phase on `main` at `ffd1580` (after PR #8 and #9 merged): fresh dataset download (hash match), preprocessing (288 records), index build (863 chunks), 95/96 unit tests pass (1 skipped without `RUN_LLM_TESTS`), 30/30 live-LLM tests pass, `scripts/hybrid_eval.py` reproduces the published numbers exactly (named-product top-5 25/30→28/30, MRR 0.783→0.869), and the Streamlit app was launched and driven through factual, comparison and unsupported-question flows with correct behavior in each.
 
-M5's Phase 5 evaluation corpus (`docs/evaluation.md`, `data/evaluation/results.csv`) found two reproducible defects not covered above, and M5 is holding this phase open until they are fixed rather than tracking them as accepted limitations:
+M5's Phase 5 evaluation corpus (`docs/evaluation.md`, `data/evaluation/results.csv`) found two reproducible defects not covered above, and M5 held this phase open until they were fixed rather than tracking them as accepted limitations. **Both are now fixed** on branch `fix/p5-eval-defects` (not yet merged):
 
-1. **Budget constraint silently dropped** on "under `<number>` with `<trailing clause>`" phrasing (see `docs/evaluation.md` failure case 1) — `src/query_understanding.py`'s budget regex needs to tolerate a trailing clause after the number.
-2. **Wireless products never retrieved** for a wireless-specific query despite being in-budget and in-category (see `docs/evaluation.md` failure case 2) — retrieval needs a connectivity-aware filter or boost in `src/retrieval.py` / `src/hybrid.py`.
+1. **Budget constraint silently dropped** on "under `<number>` with `<trailing clause>`" phrasing (see `docs/evaluation.md` failure case 1) — fixed: `_AMOUNT`'s unit-exclusion lookahead was missing a trailing `\b`, so "with" was mistaken for "watt(s)"; added the `\b` plus a defense-in-depth price post-filter in `answer_question()`. Re-verified: the home-theatre question now returns only the 2 in-budget products.
+2. **Wireless products never retrieved** for a wireless-specific query despite being in-budget and in-category (see `docs/evaluation.md` failure case 2) — fixed: added `Constraints.connectivity` plus a name-matched boost/re-rank in `Retriever.search()` and `HybridRetriever.search()`. Re-verified: the wireless-headphones question now returns real wireless products instead of refusing.
 
-Next action: fix both in a `fix/p5-...` branch, re-run `scripts/phase5_evaluation.py` to confirm, then re-open this acceptance.
+Full re-verification after both fixes: 99/100 unit tests pass (1 skipped without `RUN_LLM_TESTS`), 33/33 live-LLM tests pass, `scripts/phase5_evaluation.py` re-run end to end with no regressions in the other 15 questions. New regression tests: `BudgetTests.test_trailing_clause_after_amount_does_not_hide_budget` and `RealIndexTests.test_wireless_headphones_connectivity_regression`.
+
+Next action: M5 to confirm final acceptance, then merge `fix/p5-eval-defects` and tag `phase-4-complete`.
 
 | Role | Name | Date | Commit | Decision or evidence |
 | --- | --- | --- | --- | --- |

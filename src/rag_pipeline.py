@@ -130,7 +130,8 @@ def answer_question(question: str, history: list[dict] | None = None, *, retriev
         constraints = Constraints(
             max_price=constraints.max_price if constraints.has_price_limit else earlier.max_price,
             min_price=constraints.min_price if constraints.has_price_limit else earlier.min_price,
-            categories=constraints.categories or earlier.categories)
+            categories=constraints.categories or earlier.categories,
+            connectivity=constraints.connectivity or earlier.connectivity)
     retriever = retriever or Retriever()
     targets = extract_comparison_targets(question)
     notes: list[str] = []
@@ -139,7 +140,15 @@ def answer_question(question: str, history: list[dict] | None = None, *, retriev
         sources, notes = _retrieve_named(targets, retriever, constraints, k)
     if not sources:
         sources = retriever.search(search_text, k, max_price=constraints.max_price, min_price=constraints.min_price,
-                                   categories=constraints.categories or None)
+                                   categories=constraints.categories or None, connectivity=constraints.connectivity)
+
+    if constraints.has_price_limit:
+        # Phase 5 defense-in-depth: re-check price here too, so a future budget-extraction miss can only
+        # ever under-filter (fail open to "no match") rather than silently hand the LLM an out-of-budget
+        # source, which is what let the home-theatre budget bug go unnoticed by the pipeline itself.
+        sources = [s for s in sources if s.price is not None
+                  and (constraints.max_price is None or s.price <= constraints.max_price)
+                  and (constraints.min_price is None or s.price >= constraints.min_price)]
 
     if not sources:
         if constraints.has_price_limit:
