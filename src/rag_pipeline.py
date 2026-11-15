@@ -16,7 +16,7 @@ from dataclasses import asdict, dataclass, field
 
 from src import settings
 from src.prompts import FALLBACK_MESSAGE, NO_BUDGET_MATCH_MESSAGE, SYSTEM_PROMPT, build_user_message
-from src.query_understanding import Constraints, extract_comparison_targets, understand
+from src.query_understanding import Constraints, extract_comparison_targets, is_follow_up, understand
 from src.retrieval import RetrievedChunk, Retriever
 
 _CITATION = re.compile(r"\[([A-Za-z0-9_\-]+)\]")
@@ -50,6 +50,17 @@ def _clean_history(history: list[dict] | None) -> list[dict]:
     ok = [{"role": m["role"], "content": str(m["content"])} for m in (history or [])
           if isinstance(m, dict) and m.get("role") in ("user", "assistant") and m.get("content")]
     return ok[-settings.HISTORY_MESSAGES:]
+
+
+def _search_text(question: str, history: list[dict] | None) -> str:
+    """Retrieval text. A follow-up ("which of those is cheaper?") is searched together with the
+    most recent user question that stood on its own, so its products and filters carry over."""
+    if not is_follow_up(question):
+        return question
+    for m in reversed(_clean_history(history)):
+        if m["role"] == "user" and not is_follow_up(m["content"]):
+            return f"{m['content']} {question}"
+    return question
 
 
 def _words(text: str) -> set[str]:
@@ -112,7 +123,14 @@ def answer_question(question: str, history: list[dict] | None = None, *, retriev
     question = (question or "").strip()
     if not question:
         raise ValueError("Question must not be empty.")
+    search_text = _search_text(question, history)
     constraints = understand(question)
+    if search_text != question:  # a follow-up keeps the earlier question's filters unless it sets its own
+        earlier = understand(search_text[: -len(question) - 1])
+        constraints = Constraints(
+            max_price=constraints.max_price if constraints.has_price_limit else earlier.max_price,
+            min_price=constraints.min_price if constraints.has_price_limit else earlier.min_price,
+            categories=constraints.categories or earlier.categories)
     retriever = retriever or Retriever()
     targets = extract_comparison_targets(question)
     notes: list[str] = []
@@ -120,7 +138,7 @@ def answer_question(question: str, history: list[dict] | None = None, *, retriev
     if targets:
         sources, notes = _retrieve_named(targets, retriever, constraints, k)
     if not sources:
-        sources = retriever.search(question, k, max_price=constraints.max_price, min_price=constraints.min_price,
+        sources = retriever.search(search_text, k, max_price=constraints.max_price, min_price=constraints.min_price,
                                    categories=constraints.categories or None)
 
     if not sources:
