@@ -28,9 +28,9 @@
     "phase": 4,
     "title": "Streamlit application and RAG enhancement",
     "owner": "M4",
-    "status": "ready_for_review",
+    "status": "blocked",
     "handoff": "handoffs/phase-04.md",
-    "evidence": "Streamlit chat with product cards (image, historical price, rating, link), follow-ups, answer cache; gemini-3.1-flash-lite median 2.2 s. Hybrid RAG adopted: named-product rank 1 22/30 to 25/30, category queries unchanged with app filters, off-topic scores unchanged. Fresh clone reproduces from README; 96 tests pass. CI green on PR #9. Presentation-laptop run pending. Awaiting M5 review."
+    "evidence": "Streamlit chat with product cards (image, historical price, rating, link), follow-ups, answer cache; gemini-3.1-flash-lite median 2.2 s. Hybrid RAG adopted: named-product rank 1 22/30 to 25/30, category queries unchanged with app filters, off-topic scores unchanged. Fresh clone reproduces from README; 96 tests pass. CI green on PR #9. M5 independently reproduced on main at ffd1580 (95/96 tests, 30/30 live-LLM tests, hybrid_eval numbers match). Changes required: 2 tracked defects found in Phase 5 evaluation (budget regex drops trailing-clause constraints; wireless products not retrieved for wireless-specific queries) - see docs/handoffs/phase-04.md and docs/evaluation.md. Presentation-laptop run still pending."
   },
   {
     "phase": 5,
