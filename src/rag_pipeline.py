@@ -110,12 +110,22 @@ def make_client():
 
 def _call_llm(client, messages: list[dict]) -> str:
     model = os.getenv(settings.LLM_MODEL_ENV) or settings.DEFAULT_LLM_MODEL
-    try:
-        resp = client.chat.completions.create(model=model, messages=messages, temperature=0)
-    except Exception as exc:  # the SDK raises several error types; surface one friendly message
-        raise LLMUnavailableError(
-            f"The language model is unavailable right now ({type(exc).__name__}). Please try again.") from exc
-    return (resp.choices[0].message.content or "").strip()
+    fallback_model = os.getenv(settings.LLM_FALLBACK_MODEL_ENV) or settings.DEFAULT_FALLBACK_LLM_MODEL
+    attempts = [(model, {})]
+    if fallback_model and fallback_model != model:
+        # Phase 5 reliability fix: one more try with a different model before giving up on a
+        # transient failure, rather than making the person resend the question by hand.
+        attempts.append((fallback_model, {"timeout": settings.LLM_FALLBACK_TIMEOUT_SECONDS}))
+    errors: list[str] = []
+    for attempt_model, extra_kwargs in attempts:
+        try:
+            resp = client.chat.completions.create(model=attempt_model, messages=messages, temperature=0,
+                                                   **extra_kwargs)
+            return (resp.choices[0].message.content or "").strip()
+        except Exception as exc:  # the SDK raises several error types; try the fallback before giving up
+            errors.append(f"{attempt_model}: {type(exc).__name__}")
+    raise LLMUnavailableError(
+        f"The language model is unavailable right now ({'; '.join(errors)}). Please try again.")
 
 
 def answer_question(question: str, history: list[dict] | None = None, *, retriever: Retriever | None = None,

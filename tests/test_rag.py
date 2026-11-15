@@ -47,6 +47,20 @@ class FakeClient:
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=self.reply))])
 
 
+class FailOnModelClient:
+    """Fails for one model, succeeds for any other - proves _call_llm actually switches models."""
+
+    def __init__(self, fail_model, reply="Try [P1]."):
+        self.fail_model, self.reply, self.calls = fail_model, reply, []
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
+
+    def _create(self, **kwargs):
+        self.calls.append(kwargs)
+        if kwargs["model"] == self.fail_model:
+            raise TimeoutError("stalled")
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=self.reply))])
+
+
 class BudgetTests(unittest.TestCase):
     def test_max_price_forms(self):
         for text, expected in [("laptop under 50,000", 50000), ("below Rs 2000", 2000), ("under ₹1,500", 1500),
@@ -224,6 +238,22 @@ class PipelineTests(unittest.TestCase):
     def test_llm_failure_is_a_friendly_error(self):
         with self.assertRaises(LLMUnavailableError):
             answer_question("router", retriever=FakeRetriever([chunk("P1")]), client=FakeClient(fail=True))
+
+    def test_falls_back_to_a_different_model_after_a_transient_failure(self):
+        # Phase 5 reliability fix: a transient failure on the primary model (timeout, 5xx, ...)
+        # should not surface to the person as a dead end; try once more with a different model first.
+        saved = {k: os.environ.pop(k, None) for k in (settings.LLM_MODEL_ENV, settings.LLM_FALLBACK_MODEL_ENV)}
+        try:
+            client = FailOnModelClient(fail_model=settings.DEFAULT_LLM_MODEL)
+            r = answer_question("router", retriever=FakeRetriever([chunk("P1")]), client=client)
+            self.assertEqual(r.reason, "answered")
+            self.assertEqual([c["model"] for c in client.calls],
+                             [settings.DEFAULT_LLM_MODEL, settings.DEFAULT_FALLBACK_LLM_MODEL])
+            self.assertEqual(client.calls[1]["timeout"], settings.LLM_FALLBACK_TIMEOUT_SECONDS)
+        finally:
+            for k, v in saved.items():
+                if v is not None:
+                    os.environ[k] = v
 
     def test_missing_key_is_a_friendly_error(self):
         saved = os.environ.pop(settings.LLM_API_KEY_ENV, None)

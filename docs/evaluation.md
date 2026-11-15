@@ -10,7 +10,9 @@ Phase 1 checks CSV validation, allowed-category matching, deduplication, stable 
 
 **Unsupported-question handling:** 4/4 correctly refused with no invented information (`capital of France`, delivery policy, return policy, "do you sell smartphones" — the catalogue has 0 phones).
 
-**Observed but not reproduced on demand:** Gemini occasionally stalls past the 15 s timeout even with the SDK's built-in retry (`max_retries=2`), matching the Phase 4 handoff's note on this. Happened once in ~34 live calls across this run and earlier manual testing. Not treated as a failure case below since it is already documented and accepted for the demo (warm the cache beforehand, as the Phase 4 handoff recommends).
+**Observed but not reproduced on demand:** Gemini occasionally stalls or returns a transient error (seen: `InternalServerError`, `APITimeoutError`) even with the SDK's built-in retry (`max_retries=2`), matching the Phase 4 handoff's note on this. Previously this surfaced to the person as a dead end requiring them to resend the question by hand.
+
+**Mitigation added:** `_call_llm()` in `src/rag_pipeline.py` now tries once more with a different model (`LLM_FALLBACK_MODEL`, default `gemini-3.5-flash`, with its own longer timeout) before giving up, instead of raising immediately. Regression test: `PipelineTests.test_falls_back_to_a_different_model_after_a_transient_failure` in `tests/test_rag.py`. This reduces how often the person sees the error banner at all; it does not change the underlying grounding or retrieval behavior.
 
 ### Failure case 1: budget constraint silently dropped on a multi-part question
 
